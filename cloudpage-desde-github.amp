@@ -1,0 +1,36 @@
+<script runat="server">
+  Platform.Load('Core', '1.1')
+
+  // Variables globales
+  // Cambia estas variables de acuerdo a tu configuración
+  var userDetails = {
+           username : "salesforcecancun",
+           token    : "c0b6a550b1aaaca1292e11cbe786e56d40b98c49",
+           repoName : "salesforce-cancun",
+           fileName : "cloudpage.amp"
+        }
+
+  // No modificar nada debajo de esta sección
+  // Función para obtener el contenido del repo privado
+  function getPrivateRepoContent(obj){
+      var resource = 'https://api.github.com/repos/'+ obj.username + '/' + obj.repoName + '/contents/' + obj.fileName
+      var req = new Script.Util.HttpRequest(resource);
+          req.emptyContentHandling = 0;
+          req.retries = 2;
+          req.continueOnError = true;
+          req.contentType = "application/json; charset=utf-8"
+          req.setHeader("Authorization","token " + obj.token);
+          req.setHeader("User-Agent", obj.username + '/' + obj.repoName);
+          // Este header es muy importante: permite obtener la versión RAW del archivo
+          req.setHeader("Accept", "application/vnd.github.v3.raw");
+          req.setHeader("Cache-Control", "");
+          req.method = "GET";
+      var resp = req.send();
+      // Asignamos el contenido recibido a una variable de AMPscript
+      Platform.Variable.SetValue("@runCode", resp.content)
+  }
+
+  // Ejecutamos la función usando la configuración
+  getPrivateRepoContent(userDetails)
+</script>
+%%=TreatAsContent(@runCode)=%%
