@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Extraer metadatos de campos de DE</title>
+  <title>Extract DE Fields Metadata</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { color: #003366; }
@@ -12,33 +12,33 @@
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
     th { background-color: #f2f2f2; }
     .download-button { margin-top: 20px; }
+    #inputFeedback { font-size: 0.9em; color: red; margin-top: 4px; }
   </style>
 </head>
 <body>
-  <h1>Extraer metadatos de campos de DE</h1>
+  <h1>Extract DE Fields Metadata</h1>
 
-  <form method="GET">
-    <label><strong>Destino:</strong></label>
-    <label><input type="radio" name="target" value="de" %%[IF RequestParameter("target") == "de" THEN]%%checked%%[ENDIF]%%> Data Extension (nombre de la DE)</label>
-    <label><input type="radio" name="target" value="folder" %%[IF RequestParameter("target") == "folder" OR EMPTY(RequestParameter("target")) THEN]%%checked%%[ENDIF]%%> Carpeta (Category ID)</label>
-
-    <label for="identifier"><strong>Identificador:</strong></label>
+  <form method="GET" onsubmit="return validateInput()">
+    <label for="identifier"><strong>Enter a Data Extension name or a folder Category ID:</strong></label>
     <input type="text" name="identifier" id="identifier" value="%%=v(RequestParameter("identifier"))=%%" required>
-
-    <button type="submit">Procesar</button>
+    <small id="inputFeedback"></small>
+    <button type="submit">Process</button>
   </form>
 
+  <div id="resultsContainer">
   <script runat="server">
     Platform.Load("Core", "1.1");
 
-    var target = Request.GetQueryStringParameter("target") || "folder";
     var identifier = Request.GetQueryStringParameter("identifier");
+
+    function isNumeric(str) {
+      return /^\d+$/.test(str);
+    }
 
     if (identifier) {
       var des = [];
 
-      // Buscar por carpeta o por nombre de DE
-      if (target === "folder") {
+      if (isNumeric(identifier)) {
         des = DataExtension.Retrieve({
           Property: "CategoryID",
           SimpleOperator: "equals",
@@ -53,8 +53,8 @@
       }
 
       if (des && des.length > 0) {
-        Write('<button class="download-button" onclick="downloadTableAsCSV()">Descargar CSV</button>');
-        Write("<table id='deTable'><tr><th>Nombre DE</th><th>Customer Key</th><th>Campo</th><th>Tipo</th><th>Longitud</th><th>Llave Primaria</th><th>Nullable</th><th># Filas</th></tr>");
+        Write('<button class="download-button" onclick="downloadTableAsCSV()">Download CSV</button>');
+        Write("<table id='deTable'><tr><th>DE Name</th><th>Customer Key</th><th>Field Name</th><th>Field Type</th><th>Max Length</th><th>Is Primary Key</th><th>Is Nullable</th><th>Row Count</th></tr>");
 
         for (var i = 0; i < des.length; i++) {
           var de = des[i];
@@ -71,7 +71,7 @@
   <script runat="server">
           var rowCount = Variable.GetValue("@rowCount");
           if (!rowCount || rowCount === "") {
-            rowCount = "No disponible";
+            rowCount = "Unavailable";
           }
 
           try {
@@ -87,39 +87,70 @@
                   "<td>" + f.Name + "</td>" +
                   "<td>" + f.FieldType + "</td>" +
                   "<td>" + (f.MaxLength || "") + "</td>" +
-                  "<td>" + (f.IsPrimaryKey === true ? "Sí" : "") + "</td>" +
-                  "<td>" + (f.IsNullable === true ? "Sí" : "No") + "</td>" +
+                  "<td>" + (f.IsPrimaryKey === true ? "Yes" : "") + "</td>" +
+                  "<td>" + (f.IsNullable === true ? "Yes" : "No") + "</td>" +
                   "<td>" + rowCount + "</td>" +
                   "</tr>");
               }
             } else {
-              Write("<tr><td colspan='8'><em>No se encontraron campos para la DE: " + deName + "</em></td></tr>");
+              Write("<tr><td colspan='8'><em>No fields found for DE: " + deName + "</em></td></tr>");
             }
           } catch (e) {
-            Write("<tr><td colspan='8' style='color:red;'>Error al obtener campos para la DE: " + deName + " - " + String(e) + "</td></tr>");
+            Write("<tr><td colspan='8' style='color:red;'>Error retrieving fields for DE: " + deName + " - " + String(e) + "</td></tr>");
           }
         }
         Write("</table>");
       } else {
-        Write("<p style='color:red;'>No se encontraron Data Extensions para el identificador proporcionado.</p>");
+        Write("<p style='color:red;'>⚠️ No Data Extensions found for the given identifier.</p>");
       }
     }
   </script>
+  </div>
 
   <script>
+    function validateInput() {
+      const input = document.getElementById("identifier").value.trim();
+      const feedback = document.getElementById("inputFeedback");
+
+      if (input === "") {
+        feedback.textContent = "Field cannot be empty.";
+        return false;
+      } else if (!/^[\w\s\-]+$/.test(input)) {
+        feedback.textContent = "Invalid characters. Use only letters, numbers, dashes and spaces.";
+        return false;
+      } else {
+        feedback.textContent = "";
+        return true;
+      }
+    }
+
     function downloadTableAsCSV() {
-      var table = document.getElementById("deTable");
-      var rows = table.querySelectorAll("tr");
+      const identifier = document.getElementById("identifier").value.trim();
+      const today = new Date();
+      const yyyymmdd = today.getFullYear().toString()
+        + String(today.getMonth() + 1).padStart(2, '0')
+        + String(today.getDate()).padStart(2, '0');
+
+      let filename = "";
+      if (/^\d+$/.test(identifier)) {
+        filename = `DE_category_${identifier}_metadata_${yyyymmdd}.csv`;
+      } else {
+        const safeName = identifier.replace(/[^a-zA-Z0-9_-]/g, "_");
+        filename = `${safeName}_metadata_${yyyymmdd}.csv`;
+      }
+
+      const table = document.getElementById("deTable");
+      const rows = table.querySelectorAll("tr");
       let csvContent = "";
       rows.forEach(row => {
         let cols = row.querySelectorAll("td, th");
         let line = Array.from(cols).map(col => '"' + col.innerText.replace(/"/g, '""') + '"').join(",");
         csvContent += line + "\n";
       });
-      var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      var link = document.createElement("a");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = "de_metadata_export.csv";
+      link.download = filename;
       link.click();
     }
   </script>
