@@ -1,0 +1,14 @@
+<script runat="server">
+  Platform.Load("core", "1.1");
+
+  var pages = CloudPages.Retrieve();
+  for (var i = 0; i < pages.length; i++) {
+    var name = pages[i].Name;
+    var url = pages[i].URL;
+    var status = pages[i].IsPublished;
+
+    Write("Nombre: " + name + "<br>");
+    Write("URL: " + url + "<br>");
+    Write("Publicado: " + status + "<hr>");
+  }
+</script>

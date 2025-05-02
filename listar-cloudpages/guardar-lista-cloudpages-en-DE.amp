@@ -1,0 +1,16 @@
+<script runat="server">
+  Platform.Load("core", "1.1");
+
+  var pages = CloudPages.Retrieve();
+  for (var i = 0; i < pages.length; i++) {
+    var name = pages[i].Name;
+    var url = pages[i].URL;
+    var status = pages[i].IsPublished;
+
+    Platform.Function.InsertData(
+      "NombreDeTuDE",
+      ["PageName", "PageURL", "IsPublished"],
+      [name, url, status]
+    );
+  }
+</script>
